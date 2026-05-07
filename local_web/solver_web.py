@@ -150,6 +150,12 @@ state = st.selectbox(
     format_func=lambda n: f"n = {n}, E = {E[n]:.4f} eV"
 )
 
+display_mode = st.radio(
+    "显示空间",
+    ["实空间", "k空间"],
+    horizontal=True
+)
+
 col1, col2 = st.columns([1, 2])
 
 with col1:
@@ -162,28 +168,84 @@ with col2:
 
     fig, ax1 = plt.subplots(figsize=(9, 5))
 
-    ax1.plot(x, np.real(psi[:, state]), label=f"Re ψ{state}")
-    ax1.plot(x, np.imag(psi[:, state]), label=f"Im ψ{state}")
-    ax1.plot(x, np.abs(psi[:, state]) ** 2, label=f"|ψ{state}|²")
-    ax1.set_xlabel("x / nm")
-    ax1.set_ylabel("wave function / probability density")
-    y_max = max(
-        np.max(np.real(psi[:, state])),
-        np.max(np.imag(psi[:, state])),
-        np.max(np.abs(psi[:, state])**2)
-    )
-    ax1.set_ylim(-1.2*y_max,1.2*y_max)
+    if display_mode == "实空间":
+
+        ax1.plot(x, np.real(psi[:, state]), label=f"Re ψ{state}")
+        ax1.plot(x, np.imag(psi[:, state]), label=f"Im ψ{state}")
+        ax1.plot(x, np.abs(psi[:, state]) ** 2, label=f"|ψ{state}|²")
+
+        ax1.set_xlabel("x / nm")
+        ax1.set_ylabel("wave function / probability density")
+
+        y_max = max(
+            np.max(np.abs(np.real(psi[:, state]))),
+            np.max(np.abs(np.imag(psi[:, state]))),
+            np.max(np.abs(psi[:, state]) ** 2)
+        )
+
+        ax1.set_ylim(-1.2 * y_max, 1.2 * y_max)
+
+        ax2 = ax1.twinx()
+
+        ax2.plot(x, V, color="black", linewidth=2, label="V(x)")
+        ax2.axhline(
+            E[state],
+            color="gray",
+            linestyle="--",
+            linewidth=1,
+            label=f"E{state}"
+        )
+
+        ax2.set_ylabel("Energy / eV")
+        ax2.set_ylim(-3, 3)
+
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+
+        ax1.legend(
+            lines1 + lines2,
+            labels1 + labels2,
+            loc="upper right"
+        )
+
+    else:
+
+        N_fft = len(x)
+        dx = x[1] - x[0]
+
+        k = 2 * np.pi * np.fft.fftfreq(N_fft, d=dx)
+        k = np.fft.fftshift(k)
+
+        psi_k = np.fft.fftshift(
+            np.fft.fft(psi[:, state])
+        ) * dx
+
+        dk = k[1] - k[0]
+
+        psi_k /= np.sqrt(
+            np.sum(np.abs(psi_k) ** 2) * dk
+        )
+
+        ax1.plot(k, np.real(psi_k), label=f"Re ψ_k{state}")
+        ax1.plot(k, np.imag(psi_k), label=f"Im ψ_k{state}")
+        ax1.plot(k, np.abs(psi_k) ** 2, label=f"|ψ_k{state}|²")
+
+        ax1.set_xlabel("k")
+        ax1.set_ylabel("momentum-space wave function")
+
+        y_max = max(
+            np.max(np.abs(np.real(psi_k))),
+            np.max(np.abs(np.imag(psi_k))),
+            np.max(np.abs(psi_k) ** 2)
+        )
+
+        ax1.set_ylim(-1.2 * y_max, 1.2 * y_max)
+
+        ax1.set_xlim(-20, 20)
+
+        ax1.legend(loc="upper right")
+
     ax1.grid(True)
-
-    ax2 = ax1.twinx()
-    ax2.plot(x, V, color="black", linewidth=2, label="V(x)")
-    ax2.axhline(E[state], color="gray", linestyle="--", linewidth=1, label=f"E{state}")
-    ax2.set_ylabel("Energy / eV")
-    ax2.set_ylim(-3,3)
-
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
     st.pyplot(fig)
     if st.button("播放一个周期的相位旋转"):
