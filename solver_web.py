@@ -3,6 +3,9 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import eigsh
 from scipy.sparse import diags
+import os
+import tempfile
+from matplotlib.animation import FuncAnimation, PillowWriter
 
 
 def solver_run(Vx0=(-3, -2, 2, 3), V_val=(1, 1), num_states=21, N=800):
@@ -52,6 +55,66 @@ def solver_run(Vx0=(-3, -2, 2, 3), V_val=(1, 1), num_states=21, N=800):
 
     return x, E, psi, V
 
+def make_stationary_gif(x, E, psi, V, state, fps=20, frames=120):
+    theta_list = np.linspace(0, 2 * np.pi / E[state], frames)
+
+    fig, ax1 = plt.subplots(figsize=(9, 5))
+    ax2 = ax1.twinx()
+
+    psi0 = psi[:, state].copy()
+
+    line_re, = ax1.plot(x, np.real(psi0), label=f"Re ψ{state}")
+    line_im, = ax1.plot(x, np.imag(psi0), label=f"Im ψ{state}")
+    line_prob, = ax1.plot(x, np.abs(psi0) ** 2, label=f"|ψ{state}|²")
+
+    ax2.plot(x, V, color="black", linewidth=2, label="V(x)")
+    ax2.axhline(E[state], color="gray", linestyle="--", linewidth=1, label=f"E{state}")
+
+    ax1.set_xlabel("x / nm")
+    ax1.set_ylabel("wave function / probability density")
+    ax2.set_ylabel("Energy / eV")
+
+    y_max = max(
+        np.max(np.abs(np.real(psi0))),
+        np.max(np.abs(np.imag(psi0))),
+        np.max(np.abs(psi0) ** 2)
+    )
+
+    ax1.set_ylim(-1.2 * y_max, 1.2 * y_max)
+    ax2.set_ylim(-3, 3)
+    ax1.grid(True)
+
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
+
+    def update(frame):
+        theta = theta_list[frame]
+        psi_t = psi0 * np.exp(-1j * E[state] * theta)
+
+        line_re.set_ydata(np.real(psi_t))
+        line_im.set_ydata(np.imag(psi_t))
+        line_prob.set_ydata(np.abs(psi_t) ** 2)
+
+        ax1.set_title(
+            f"n = {state}, E = {E[state]:.4f} eV, phase = {E[state] * theta:.2f}"
+        )
+
+        return line_re, line_im, line_prob
+
+    ani = FuncAnimation(
+        fig,
+        update,
+        frames=frames,
+        interval=1000 / fps,
+        blit=False
+    )
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".gif")
+    ani.save(tmp.name, writer=PillowWriter(fps=fps))
+    plt.close(fig)
+
+    return tmp.name
 
 st.set_page_config(page_title="势垒本征态求解", layout="wide")
 
@@ -123,5 +186,10 @@ with col2:
     ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
     st.pyplot(fig)
+    if st.button("播放一个周期的相位旋转"):
+        with st.spinner("正在生成动画..."):
+            gif_path = make_stationary_gif(x, E, psi, V, state)
+
+        st.image(gif_path)
 
 st.caption("当前版本只展示定态本征函数，不处理叠加态和含时演化。")
