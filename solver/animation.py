@@ -232,11 +232,11 @@ def Scatter(x,E,psi,psi_in,cut_state=200):
 
     xm = np.array(xm)
     idt = np.arange(xm.size).reshape(xm.shape)
-    bx.set_xlabel("xm")
-    bx.set_ylabel("t")
+    bx.set_xlabel("t")
+    bx.set_ylabel("xm")
     bx.legend()
     bx.grid(True)
-    bx.plot(xm, idt)
+    bx.plot(idt, xm)
     figv.savefig("figures/xm.png")
 
 if __name__ == "__main__":
