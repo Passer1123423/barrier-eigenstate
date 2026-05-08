@@ -62,11 +62,12 @@ def Animat(x,E,psi,V,n_show=[0,1]):
     plt.show()
     ani.save("figures/wave.gif", writer="pillow", fps=20)
 
-def Animat_super(x,E,psi,n_show=[0,1],c=[1,1]):
+def Animat_super(x,E,psi,V,n_show=[0,1],c=[1,1]):
     dx = x[1] - x[0]
 
     theta_list = np.linspace(0, 2 * np.pi, 120)
     fig, ax = plt.subplots(figsize=(10, 6))
+    axV = ax.twinx()
     surpsi = c[0]*psi[:,n_show[0]] + c[1]*psi[:,n_show[1]]
     surpsi = surpsi / np.sqrt(np.sum(np.abs(surpsi) ** 2)*dx)
     prob = np.abs(surpsi) ** 2
@@ -76,16 +77,18 @@ def Animat_super(x,E,psi,n_show=[0,1],c=[1,1]):
     ax.set_ylabel("P(x)")
     ax.legend()
     ax.grid(True)
+    axV.plot(x, V, color='black')
+    axV.set_ylabel("Energy / eV")
 
     ymax = max(prob)
     ax.set_ylim(-1.2 * ymax, 1.2 * ymax)
+    axV.set_ylim(-3, 3)
 
     def update(frame):
         theta = theta_list[frame]
         psi_t = psi.copy()
 
-        for n in n_show:
-            psi_t[:, 1] = psi[:, 1] * np.exp(-1j * E[n] * theta)
+        psi_t[:, 1] = psi[:, 1] * np.exp(-1j * theta)
 
         surpsi_t = c[0]*psi_t[:,n_show[0]] + c[1]*psi_t[:,n_show[1]]
         surpsi_t = surpsi_t / np.sqrt(np.sum(np.abs(surpsi_t) ** 2)*dx)
@@ -205,6 +208,7 @@ def Scatter(x,E,psi,psi_in,cut_state=20):
 if __name__ == "__main__":
     V_val = [1, 1]
     x, E, psi, V = solver_run(V_val=V_val)
-    Animat(x, E, psi, n_show=[20], V=V)
-    Animat_super(x,E,psi)
-    Animat_kspace(x,E,psi,n_show=[6])
+    print(E)
+    #Animat(x, E, psi, n_show=[1], V=V)
+    #Animat_super(x,E,psi,V=V)
+    #Animat_kspace(x,E,psi,n_show=[0])
