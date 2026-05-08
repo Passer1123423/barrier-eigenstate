@@ -5,6 +5,23 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from solver.solver import solver_run
 
+def gaussian_wavepacket(x, x0=5.0, sigma=0.8, k0=-5.0):
+    """
+    一维高斯波包
+
+    x     : 已有的空间坐标数组
+    x0    : 波包中心位置
+    sigma : 空间宽度，也就是标准差量级
+    k0    : 平均波数，对应平均动量 p0 = hbar * k0
+    """
+    psi = np.exp(-(x - x0)**2 / (4 * sigma**2)) * np.exp(1j * k0 * x)
+
+    # 按离散空间归一化，使 sum(|psi|^2) dx = 1
+    dx = x[1] - x[0]
+    psi = psi / np.sqrt(np.sum(np.abs(psi)**2) * dx)
+
+    return psi
+
 def Animat(x,E,psi,V,n_show=[0,1]):
     Et = list()
     for n in n_show:
@@ -164,10 +181,10 @@ def Animat_kspace(x,E,psi,n_show=[0,1]):
     plt.show()
     ani.save("figures/wave_kspace.gif", writer="pillow", fps=20)
 
-def Scatter(x,E,psi,psi_in,cut_state=20):
+def Scatter(x,E,psi,psi_in,cut_state=200):
     Et = E.copy()
     Et = ((Et ** -1))
-    T = np.max(Et[0])
+    T = 10
 
     dx = x[1] - x[0]
 
@@ -175,16 +192,23 @@ def Scatter(x,E,psi,psi_in,cut_state=20):
     for n in range(cut_state):
         cn[n] = np.vdot(psi[:,n], psi_in) * dx
 
-    theta_list = np.linspace(0, 2 * np.pi * T, 120)
+    theta_list = np.linspace(0, 2 * np.pi * T, 600)
     fig, ax = plt.subplots(figsize=(10, 6))
+    figv, bx = plt.subplots(figsize=(10, 6))
+    axV = ax.twinx()
 
     line_prob, = ax.plot(x, np.abs(psi_in) ** 2, label="|ψ|²")
+    xm = list()
+    xm.append(np.inner(x,np.abs(psi_in)**2)*dx)
     ax.set_xlabel("x")
     ax.set_ylabel("ψ")
     ax.legend()
     ax.grid(True)
+    axV.plot(x, V, color='black')
+    axV.set_ylabel("Energy / eV")
     ymax = np.max(np.abs(psi_in) ** 2)
     ax.set_ylim(-1.2 * ymax, 1.2 * ymax)
+    axV.set_ylim(-3,3)
 
     def update(frame):
         theta = theta_list[frame]
@@ -194,6 +218,7 @@ def Scatter(x,E,psi,psi_in,cut_state=20):
             psi_t[:,n] = psi[:, n] * np.exp(-1j * E[n] * theta)
             psi_in_t += cn[n] * psi_t[:,n]
         psi_in_t /= np.sqrt(np.sum(np.abs(psi_in_t)**2)*dx)
+        xm.append(np.inner(x, np.abs(psi_in_t) ** 2) * dx)
         line_prob.set_ydata(np.abs(psi_in_t)**2)
 
         ax.set_title(f"Stationary state, time = {theta * 6.582E-1:.2f}ps ")
@@ -205,10 +230,21 @@ def Scatter(x,E,psi,psi_in,cut_state=20):
     plt.show()
     ani.save("figures/scatter.gif", writer="pillow", fps=20)
 
+    xm = np.array(xm)
+    idt = np.arange(xm.size).reshape(xm.shape)
+    bx.set_xlabel("xm")
+    bx.set_ylabel("t")
+    bx.legend()
+    bx.grid(True)
+    bx.plot(xm, idt)
+    figv.savefig("figures/xm.png")
+
 if __name__ == "__main__":
     V_val = [1, 1]
-    x, E, psi, V = solver_run(V_val=V_val)
+    x, E, psi, V = solver_run(num_states=500)
     print(E)
     #Animat(x, E, psi, n_show=[1], V=V)
     #Animat_super(x,E,psi,V=V)
     #Animat_kspace(x,E,psi,n_show=[0])
+    psi_in = gaussian_wavepacket(x)
+    Scatter(x,E,psi,psi_in=psi_in,cut_state=500)
